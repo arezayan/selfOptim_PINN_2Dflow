@@ -167,7 +167,7 @@ model_psi = PINN_psi(layers).to(device)
 model_p = PINN_p(layers).to(device)
 model_T = PINN_T(layers).to(device)
 
-save_to_path = 'E:/FOAM_PINN/cavHeat/twoD_lamin_over_box/raiss_results/'
+save_to_path = 'E:/FOAM_PINN/cavHeat/twoD_lamin_over_box/Main_results/'
 
 ##############################################################################
 ##############################################################################
