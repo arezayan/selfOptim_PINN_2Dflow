@@ -1,0 +1,1110 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sun Oct 27 11:34:29 2024
+2D lamninar Stream Vortisity version
+
+@author: Amirreza
+"""
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.utils.data import DataLoader, TensorDataset, random_split
+import numpy as np
+import optuna
+from sklearn.model_selection import KFold
+import pandas as pd
+import matplotlib.pyplot as plt
+from tqdm import tqdm
+import time
+
+
+# Check if CUDA is available
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+class Swish(nn.Module):
+        def __init__(self, inplace=True):
+            super(Swish, self).__init__()
+            self.inplace = inplace
+
+        def forward(self, x):
+            if self.inplace:
+                x.mul_(torch.sigmoid(x))
+                return x
+            else:
+                return x * torch.sigmoid(x)
+
+
+class PINN_psi(nn.Module):
+
+        #The __init__ function stack the layers of the
+        #network Sequentially
+        def __init__(self):
+            super(PINN_psi, self).__init__()
+            self.main = nn.Sequential(
+                nn.Linear(input_n,h_n_psi),
+                #nn.Tanh(),
+                #nn.Sigmoid(),
+                #nn.BatchNorm1d(h_n_psi),
+                Swish(),
+                nn.Linear(h_n_psi,h_n_psi),
+                #nn.Tanh(),
+                #nn.Sigmoid(),
+                #nn.BatchNorm1d(h_n_psi),
+                Swish(),
+                nn.Linear(h_n_psi,h_n_psi),
+                #nn.Tanh(),
+                #nn.Sigmoid(),
+                #nn.BatchNorm1d(h_n_psi),
+                Swish(),
+                nn.Linear(h_n_psi,h_n_psi),
+
+                #nn.BatchNorm1d(h_n_psi),
+                Swish(),
+                nn.Linear(h_n_psi,h_n_psi),
+
+                #nn.BatchNorm1d(h_n_psi),
+
+                Swish(),
+                nn.Linear(h_n_psi,h_n_psi),
+
+                #nn.BatchNorm1d(h_n_psi),
+
+                Swish(),
+                nn.Linear(h_n_psi,h_n_psi),
+
+                #nn.BatchNorm1d(h_n_psi),
+
+                Swish(),
+                nn.Linear(h_n_psi,h_n_psi),
+
+                #nn.BatchNorm1d(h_n_psi),
+
+
+                Swish(),
+                nn.Linear(h_n_psi,h_n_psi),
+
+                #nn.BatchNorm1d(h_n_psi),
+
+
+                Swish(),
+
+                nn.Linear(h_n_psi,1),
+            )
+        #This function defines the forward rule of
+        #output respect to input.
+        #def forward(self,x):
+        def forward(self,x):
+            output = self.main(x)
+            return output
+
+class PINN_omega(nn.Module):
+
+        #The __init__ function stack the layers of the
+        #network Sequentially
+        def __init__(self):
+            super(PINN_omega, self).__init__()
+            self.main = nn.Sequential(
+                nn.Linear(input_n,h_n_omega),
+                #nn.Tanh(),
+                #nn.Sigmoid(),
+                #nn.BatchNorm1d(h_n_omega),
+                Swish(),
+                nn.Linear(h_n_omega,h_n_omega),
+                #nn.Tanh(),
+                #nn.Sigmoid(),
+                #nn.BatchNorm1d(h_n_omega),
+                Swish(),
+                nn.Linear(h_n_omega,h_n_omega),
+
+                #nn.BatchNorm1d(h_n_omega),
+
+                Swish(),
+                nn.Linear(h_n_omega,h_n_omega),
+                #nn.Tanh(),
+                #nn.Sigmoid(),
+
+                #nn.BatchNorm1d(h_n_omega),
+
+                Swish(),
+                nn.Linear(h_n_omega,h_n_omega),
+
+                #nn.BatchNorm1d(h_n_omega),
+
+                Swish(),
+                nn.Linear(h_n_omega,h_n_omega),
+
+                #nn.BatchNorm1d(h_n_omega),
+
+
+                Swish(),
+                nn.Linear(h_n_omega,h_n_omega),
+
+                #nn.BatchNorm1d(h_n_omega),
+
+                Swish(),
+                nn.Linear(h_n_omega,h_n_omega),
+
+                #nn.BatchNorm1d(h_n_omega),
+
+                Swish(),
+                nn.Linear(h_n_omega,h_n_omega),
+
+                #nn.BatchNorm1d(h_n_omega),
+
+                Swish(),
+
+                nn.Linear(h_n_omega,1),
+            )
+        #This function defines the forward rule of
+        #output respect to input.
+        #def forward(self,x):
+        def forward(self,x):
+            output = self.main(x)
+            return output
+        
+class PINN_u(nn.Module):
+
+        #The __init__ function stack the layers of the
+        #network Sequentially
+        def __init__(self):
+            super(PINN_u, self).__init__()
+            self.main = nn.Sequential(
+                nn.Linear(input_n,h_n_u),
+                #nn.Tanh(),
+                #nn.Sigmoid(),
+                #nn.BatchNorm1d(h_n_u),
+                Swish(),
+                nn.Linear(h_n_u,h_n_u),
+                #nn.Tanh(),
+                #nn.Sigmoid(),
+                #nn.BatchNorm1d(h_n_u),
+                Swish(),
+                nn.Linear(h_n_u,h_n_u),
+                #nn.Tanh(),
+                #nn.Sigmoid(),
+                #nn.BatchNorm1d(h_n_u),
+                Swish(),
+                nn.Linear(h_n_u,h_n_u),
+
+                #nn.BatchNorm1d(h_n_u),
+                Swish(),
+                nn.Linear(h_n_u,h_n_u),
+
+                #nn.BatchNorm1d(h_n_u),
+
+                Swish(),
+                nn.Linear(h_n_u,h_n_u),
+
+                #nn.BatchNorm1d(h_n_u),
+
+                Swish(),
+                nn.Linear(h_n_u,h_n_u),
+
+                #nn.BatchNorm1d(h_n_u),
+
+                Swish(),
+                nn.Linear(h_n_u,h_n_u),
+
+                #nn.BatchNorm1d(h_n_u),
+
+
+                Swish(),
+                nn.Linear(h_n_u,h_n_u),
+
+                #nn.BatchNorm1d(h_n_u),
+
+
+                Swish(),
+
+                nn.Linear(h_n_u,1),
+            )
+        #This function defines the forward rule of
+        #output respect to input.
+        #def forward(self,x):
+        def forward(self,x):
+            output = self.main(x)
+            return output
+
+class PINN_v(nn.Module):
+
+        #The __init__ function stack the layers of the
+        #network Sequentially
+        def __init__(self):
+            super(PINN_v, self).__init__()
+            self.main = nn.Sequential(
+                nn.Linear(input_n,h_n_v),
+                #nn.Tanh(),
+                #nn.Sigmoid(),
+                #nn.BatchNorm1d(h_n_v),
+                Swish(),
+                nn.Linear(h_n_v,h_n_v),
+                #nn.Tanh(),
+                #nn.Sigmoid(),
+                #nn.BatchNorm1d(h_n_v),
+                Swish(),
+                nn.Linear(h_n_v,h_n_v),
+
+                #nn.BatchNorm1d(h_n_v),
+
+                Swish(),
+                nn.Linear(h_n_v,h_n_v),
+                #nn.Tanh(),
+                #nn.Sigmoid(),
+
+                #nn.BatchNorm1d(h_n_v),
+
+                Swish(),
+                nn.Linear(h_n_v,h_n_v),
+
+                #nn.BatchNorm1d(h_n_v),
+
+                Swish(),
+                nn.Linear(h_n_v,h_n_v),
+
+                #nn.BatchNorm1d(h_n_v),
+
+
+                Swish(),
+                nn.Linear(h_n_v,h_n_v),
+
+                #nn.BatchNorm1d(h_n_v),
+
+                Swish(),
+                nn.Linear(h_n_v,h_n_v),
+
+                #nn.BatchNorm1d(h_n_v),
+
+                Swish(),
+                nn.Linear(h_n_v,h_n_v),
+
+                #nn.BatchNorm1d(h_n_v),
+
+                Swish(),
+
+                nn.Linear(h_n_v,1),
+            )
+        #This function defines the forward rule of
+        #output respect to input.
+        #def forward(self,x):
+        def forward(self,x):
+            output = self.main(x)
+            return output
+
+class PINN_w(nn.Module):
+
+        #The __init__ function stack the layers of the
+        #network Sequentially
+        def __init__(self):
+            super(PINN_w, self).__init__()
+            self.main = nn.Sequential(
+                nn.Linear(input_n,h_n_w),
+                #nn.Tanh(),
+                #nn.Sigmoid(),
+                #nn.BatchNorm1d(h_n_w),
+                Swish(),
+                nn.Linear(h_n_w,h_n_w),
+                #nn.Tanh(),
+                #nn.Sigmoid(),
+                #nn.BatchNorm1d(h_n_w),
+                Swish(),
+                nn.Linear(h_n_w,h_n_w),
+
+                #nn.BatchNorm1d(h_n_w),
+
+                Swish(),
+                nn.Linear(h_n_w,h_n_w),
+                #nn.Tanh(),
+                #nn.Sigmoid(),
+
+                #nn.BatchNorm1d(h_n_w),
+
+                Swish(),
+                nn.Linear(h_n_w,h_n_w),
+
+                #nn.BatchNorm1d(h_n_w),
+
+                Swish(),
+                nn.Linear(h_n_w,h_n_w),
+
+                #nn.BatchNorm1d(h_n_w),
+
+
+                Swish(),
+                nn.Linear(h_n_w,h_n_w),
+
+                #nn.BatchNorm1d(h_n_w),
+
+                Swish(),
+                nn.Linear(h_n_w,h_n_w),
+
+                #nn.BatchNorm1d(h_n_w),
+
+                Swish(),
+                nn.Linear(h_n_w,h_n_w),
+
+                #nn.BatchNorm1d(h_n_w),
+
+                Swish(),
+
+                nn.Linear(h_n_w,1),
+            )
+        #This function defines the forward rule of
+        #output respect to input.
+        #def forward(self,x):
+        def forward(self,x):
+            output = self.main(x)
+            return output
+
+class PINN_p(nn.Module):
+
+        #The __init__ function stack the layers of the
+        #network Sequentially
+        def __init__(self):
+            super(PINN_p, self).__init__()
+            self.main = nn.Sequential(
+                nn.Linear(input_n,h_n_p),
+                #nn.Tanh(),
+                #nn.Sigmoid(),
+                #nn.BatchNorm1d(h_n_p),
+                Swish(),
+                nn.Linear(h_n_p,h_n_p),
+                #nn.Tanh(),
+                #nn.Sigmoid(),
+                #nn.BatchNorm1d(h_n_p),
+                Swish(),
+                nn.Linear(h_n_p,h_n_p),
+                #nn.Tanh(),
+                #nn.Sigmoid(),
+
+                #nn.BatchNorm1d(h_n_p),
+
+                Swish(),
+                nn.Linear(h_n_p,h_n_p),
+
+                #nn.BatchNorm1d(h_n_p),
+
+                Swish(),
+                nn.Linear(h_n_p,h_n_p),
+
+                #nn.BatchNorm1d(h_n_p),
+
+                Swish(),
+                nn.Linear(h_n_p,h_n_p),
+
+                #nn.BatchNorm1d(h_n_p),
+
+                Swish(),
+                nn.Linear(h_n_p,h_n_p),
+
+                #nn.BatchNorm1d(h_n_p),
+
+                Swish(),
+                nn.Linear(h_n_p,h_n_p),
+
+                #nn.BatchNorm1d(h_n_p),
+
+                Swish(),
+                nn.Linear(h_n_p,h_n_p),
+
+                #nn.BatchNorm1d(h_n_p),
+
+                Swish(),
+                nn.Linear(h_n_p,h_n_p),
+
+                #nn.BatchNorm1d(h_n_p),
+
+                Swish(),
+
+                nn.Linear(h_n_p,1),
+            )
+        #This function defines the forward rule of
+        #output respect to input.
+        def forward(self,x):
+            output = self.main(x)
+            return  output
+
+
+class PINN_T(nn.Module):
+
+        #The __init__ function stack the layers of the
+        #network Sequentially
+        def __init__(self):
+            super(PINN_T, self).__init__()
+            self.main = nn.Sequential(
+                nn.Linear(input_n,h_n_T),
+                #nn.Tanh(),
+                #nn.Sigmoid(),
+                #nn.BatchNorm1d(h_n_T),
+                Swish(),
+                nn.Linear(h_n_T,h_n_T),
+                #nn.Tanh(),
+                #nn.Sigmoid(),
+                #nn.BatchNorm1d(h_n_T),
+                Swish(),
+                nn.Linear(h_n_T,h_n_T),
+                #nn.Tanh(),
+                #nn.Sigmoid(),
+
+                #nn.BatchNorm1d(h_n_T),
+
+                Swish(),
+                nn.Linear(h_n_T,h_n_T),
+
+                #nn.BatchNorm1d(h_n_T),
+
+                Swish(),
+                nn.Linear(h_n_T,h_n_T),
+
+                #nn.BatchNorm1d(h_n_T),
+
+                Swish(),
+                nn.Linear(h_n_T,h_n_T),
+
+                #nn.BatchNorm1d(h_n_T),
+
+                Swish(),
+                nn.Linear(h_n_T,h_n_T),
+
+                #nn.BatchNorm1d(h_n_T),
+
+                Swish(),
+                nn.Linear(h_n_T,h_n_T),
+
+                #nn.BatchNorm1d(h_n_T),
+
+                Swish(),
+                nn.Linear(h_n_T,h_n_T),
+
+                #nn.BatchNorm1d(h_n_T),
+
+                Swish(),
+                nn.Linear(h_n_T,h_n_T),
+
+                #nn.BatchNorm1d(h_n_T),
+
+                Swish(),
+
+                nn.Linear(h_n_T,1),
+            )
+        #This function defines the forward rule of
+        #output respect to input.
+        def forward(self,x):
+            output = self.main(x)
+            return  output
+
+
+
+################################################################
+
+def init_normal(m):
+		if type(m) == nn.Linear:
+			nn.init.kaiming_normal_(m.weight)
+def init_xavier(m):
+    if isinstance(m, nn.Linear):  # Check if the layer is nn.Linear
+        nn.init.xavier_normal_(m.weight)  # Xavier normal distribution
+        if m.bias is not None:           # Initialize biases to zero if present
+            nn.init.zeros_(m.bias)
+
+
+#PINN_u is model(networks foe each components)
+input_n = 2
+h_n_psi = 40
+h_n_omega = 40
+h_n_u = 40
+h_n_v = 40
+h_n_p = 40
+h_n_T = 40
+
+
+PINN_psi = PINN_psi().to(device)
+PINN_omega = PINN_omega().to(device)
+PINN_u = PINN_u().to(device)
+PINN_v = PINN_v().to(device)
+PINN_p = PINN_p().to(device)
+PINN_T = PINN_T().to(device)
+
+
+###################################################################
+#functions
+
+def normal_inputs(df): #df is a dataframe
+    normal_df = (2 * (df - df.min()) / (df.max() - df.min() )) - 1
+    return normal_df
+
+def residula_loss(PINN_psi , PINN_omega  , PINN_T , x , y ):
+
+    x = (2 * (x - x.min()) / (x.max() - x.min())) - 1
+    y = (2 * (y - y.min()) / (y.max() - y.min())) - 1
+
+    # Momentum equations
+    nu = 0.01 #kinematic viscosity
+    g = 9.8
+    alpha = 0.002
+    T_surf = 313
+    T_inf = 303
+    betha  = 1/ T_inf
+    length = 10
+    u_ref = 1
+    Pr = 1
+    Re = ((g * betha) / (nu * alpha)) * (T_surf - T_inf) * (length ** 3)
+    Ra = u_ref * length / nu
+
+
+    psi = PINN_psi(torch.cat((x,y) , dim = 1))
+    T = PINN_T(torch.cat((x,y) , dim = 1))
+    omega = PINN_omega(torch.cat((x , y) , dim = 1))
+
+    # Calculate gradients
+    psi_x = torch.autograd.grad(psi, x, grad_outputs=torch.ones_like(psi), create_graph=True)[0]
+    psi_y = torch.autograd.grad(psi, y, grad_outputs=torch.ones_like(psi), create_graph=True)[0]
+
+    psi_xx = torch.autograd.grad(psi_x, x, grad_outputs=torch.ones_like(psi_x), create_graph=True)[0]
+    psi_yy = torch.autograd.grad(psi_y, y, grad_outputs=torch.ones_like(psi_y), create_graph=True)[0]
+
+    #1:Poisson Equation for the Stream Function
+    poisson_residual = omega + (psi_xx + psi_yy)
+
+
+     #2: Define the Vorticity Transport Equation
+    omega_x = torch.autograd.grad(omega, x, grad_outputs=torch.ones_like(omega), create_graph=True)[0]
+    omega_y = torch.autograd.grad(omega, y, grad_outputs=torch.ones_like(omega), create_graph=True)[0]
+
+    omega_xx = torch.autograd.grad(omega_x, x, grad_outputs=torch.ones_like(omega_x), create_graph=True)[0]
+    omega_yy = torch.autograd.grad(omega_x, y, grad_outputs=torch.ones_like(omega_x), create_graph=True)[0]
+
+    T_x = torch.autograd.grad(T, x, grad_outputs=torch.ones_like(T), create_graph=True)[0]
+    T_y = torch.autograd.grad(T, y, grad_outputs=torch.ones_like(T), create_graph=True)[0]
+
+    T_xx = torch.autograd.grad(T_x, x, grad_outputs=torch.ones_like(T_x), create_graph=True)[0]
+    T_yy = torch.autograd.grad(T_x, y, grad_outputs=torch.ones_like(T_x), create_graph=True)[0]
+
+    vorticity_residual =  psi_y * omega_x - psi_x * omega_y - (1/Re) * (omega_xx + omega_yy) - Ra * T_x
+
+    #3 : Energy Equation Residual
+
+    energy_residual =  psi_y * T_x - psi_x * T_y - (1/(Re * Pr)) * (T_xx + T_yy)
+
+
+
+    loss_mse = nn.MSELoss()
+    #Note our target is zero. It is residual so we use zeros_like
+    loss_pde = loss_mse(poisson_residual,torch.zeros_like(poisson_residual)) + loss_mse(vorticity_residual,torch.zeros_like(vorticity_residual)) + loss_mse(energy_residual,torch.zeros_like(energy_residual))
+    return loss_pde
+
+
+def add_gaussian_noise(tensor, mean=0.0, std_dev=0.01):
+    noise = torch.normal(mean, std_dev, size=tensor.shape)
+    return tensor + noise
+
+
+def boundary_condition_loss(PINN_u , PINN_v , PINN_p ,PINN_T , X , Y):
+
+    u_b_pred = PINN_u(X)
+    v_b_pred = PINN_v(X)
+    p_b_pred = PINN_p(X)
+    T_b_pred = PINN_T(X)
+
+    loss_mse = nn.MSELoss()
+    loss_u_b = loss_mse(u_b_pred  , (Y[: ,1]).reshape(-1 , 1))
+    loss_v_b = loss_mse(v_b_pred  , (Y[: ,2]).reshape(-1 , 1))
+    loss_p_b = loss_mse(p_b_pred  , (Y[: ,0]).reshape(-1 , 1))
+    loss_T_b = loss_mse(T_b_pred  , (Y[: ,2]).reshape(-1 , 1))
+
+    loss_bc = loss_u_b + loss_v_b + loss_p_b + loss_T_b
+    return loss_bc
+
+
+def data_loss(PINN_u , PINN_v , PINN_p ,PINN_T , X , Y):
+
+    u_d_pred = PINN_u(X)
+    v_d_pred = PINN_v(X)
+    p_d_pred = PINN_p(X)
+    T_d_pred = PINN_T(X)
+
+    loss_mse = nn.MSELoss()
+    loss_u_d = loss_mse(u_d_pred  , (Y[: ,1].reshape(-1 , 1)))
+    loss_v_d = loss_mse(v_d_pred  , (Y[: ,2].reshape(-1 , 1)))
+    loss_p_d = loss_mse(p_d_pred  , (Y[: ,0].reshape(-1 , 1)))
+    loss_T_d = loss_mse(T_d_pred  , (Y[: ,2].reshape(-1 , 1)))
+
+    loss_data = loss_u_d + loss_v_d + loss_p_d + loss_T_d
+    return loss_data
+
+def noisy_data_loss(PINN_u , PINN_v , PINN_p ,PINN_T , X , Y):
+
+    x_d_noisy = add_gaussian_noise(X[: , 0].reshape(-1 , 1))
+    y_d_noisy = add_gaussian_noise(X[: , 1].reshape(-1 , 1))
+    u_d_noisy = add_gaussian_noise(Y[: , 1].reshape(-1 , 1))
+    v_d_noisy = add_gaussian_noise(Y[: , 2].reshape(-1 , 1))
+    p_d_noisy = add_gaussian_noise(Y[: , 0].reshape(-1 , 1))
+    T_d_noisy = add_gaussian_noise(Y[: , 2].reshape(-1 , 1))
+
+    u_d_noisy_pred = PINN_u(X)
+    v_d_noisy_pred = PINN_v(X)
+    p_d_noisy_pred = PINN_p(X)
+    T_d_noisy_pred = PINN_T(X)
+
+    loss_mse = nn.MSELoss()
+    loss_u_d_noisy = loss_mse(u_d_noisy_pred  , u_d_noisy)
+    loss_v_d_noisy = loss_mse(v_d_noisy_pred  , v_d_noisy)
+    loss_p_d_noisy = loss_mse(p_d_noisy_pred  , p_d_noisy)
+    loss_T_d_noisy = loss_mse(T_d_noisy_pred  , T_d_noisy)
+
+    loss_noisy_data = loss_u_d_noisy + loss_v_d_noisy + loss_p_d_noisy + loss_T_d_noisy
+    return loss_noisy_data
+
+def total_loss(PINN_u , PINN_v , PINN_p ,PINN_T , PINN_psi, PINN_omega , x_c , y_c,
+               X_b , Y_b , X_d , Y_d):
+    pde_loss = residula_loss(PINN_psi , PINN_omega  , PINN_T , x_c , y_c )
+    bc_loss = boundary_condition_loss(PINN_u , PINN_v , PINN_p ,PINN_T , X_b , Y_b)
+    interior_loss = data_loss(PINN_u , PINN_v , PINN_p ,PINN_T , X_d , Y_d)
+    noisy_loss = noisy_data_loss(PINN_u , PINN_v , PINN_p ,PINN_T , X_d , Y_d)
+    loss = (pde_loss * lambda_pde) + (bc_loss * lambda_bc) + (interior_loss * lambda_interior) + (noisy_loss * w_noise)
+    return loss
+
+def plot_results(PINN_u , PINN_v , PINN_T , PINN_p, ff):
+    PINN_u.eval()
+    PINN_v.eval()
+    PINN_T.eval()
+    PINN_p.eval()
+
+    #df = normal_inputs(pd.read_csv(file_tset))
+    df = pd.read_csv(ff)
+    df = 2 * ((df - df.min()) / (df.max() - df.min())) - 1
+    X = torch.tensor(df[['x','y']].values, dtype=torch.float32)
+    Y = torch.tensor(df[['u' ,'v' ,'T' ,'p']].values, dtype=torch.float32)
+
+    u_pred = PINN_u(X)
+    v_pred = PINN_v(X)
+    T_pred = PINN_T(X)
+    p_pred = PINN_p(X)
+    fig, ax= plt.subplots(nrows=2 , ncols=2 , figsize=(14, 10) , sharex = True)
+
+
+    ax[0 , 0].set_title("u velocity")
+    ax[0 , 0].plot(Y[: ,0] , label = "Exact")
+    ax[0 , 0].plot(u_pred.detach().numpy() , label= "PINN")
+    ax[0 , 0].legend(loc="upper right")
+
+
+    ax[0 , 1].set_title("v velocity")
+    ax[0 , 1].plot(Y[: ,1] , label = "Exact")
+    ax[0 , 1].plot(v_pred.detach().numpy() , label= "PINN")
+    ax[0 , 1].legend(loc="upper right")
+
+    ax[1 , 1].set_title("T velocity")
+    ax[1 , 1].plot(Y[: ,2] , label = "Exact")
+    ax[1 , 1].plot(T_pred.detach().numpy() , label= "PINN")
+    ax[1 , 1].legend(loc="upper right")
+
+    ax[1 , 0].set_title("p velocity")
+    ax[1 , 0].plot(Y[: ,3] , label = "Exact")
+    ax[1 , 0].plot(p_pred.detach().numpy() , label= "PINN")
+    ax[1 , 0].legend(loc="upper right")
+
+
+    fig.suptitle(f'Comparison With Unseen Data : {ff}')
+    #fig.savefig("Results/Comparison_plot" + time.strftime("%Y-%m-%d %H%M%S") + ".png")
+    plt.show()
+
+
+###################################################################
+
+
+
+# Dynamic learning rate and optimizer switch
+def train_pinn(PINN_u , PINN_v , PINN_p ,PINN_T , PINN_psi, PINN_omega , filename_data,
+    filename_bc  ,epochs_adam , epoch_lbgfs , num_collocation_points  ):
+    print("Train starting . . . ")
+    # Simulate a long process
+    for i in tqdm(range(100)):
+        time.sleep(0.05)  # Simulating work by sleeping
+
+
+
+    tic = time.time()
+    optimizer_adam_u = optim.Adam(PINN_u.parameters(), lr=0.001)
+    optimizer_adam_v = optim.Adam(PINN_v.parameters(), lr=0.001)
+    optimizer_adam_T = optim.Adam(PINN_T.parameters(), lr=0.001)
+    optimizer_adam_p = optim.Adam(PINN_p.parameters(), lr=0.001)
+    optimizer_adam_psi = optim.Adam(PINN_psi.parameters(), lr=0.001)
+    optimizer_adam_omega = optim.Adam(PINN_omega.parameters(), lr=0.001)
+    #optimizer_adam_phi = optim.Adam(PINN_phi.parameters(), lr=0.001)
+
+    scheduler_u = ReduceLROnPlateau(optimizer_adam_u , factor = 0.5 , min_lr = 1e-2 , verbose=False )
+    scheduler_v = ReduceLROnPlateau(optimizer_adam_v , factor = 0.5 , min_lr = 1e-2 , verbose=False )
+    scheduler_T = ReduceLROnPlateau(optimizer_adam_T , factor = 0.5 , min_lr = 1e-2 , verbose=False )
+    scheduler_p = ReduceLROnPlateau(optimizer_adam_p , factor = 0.5 , min_lr = 1e-2 , verbose=False )
+    scheduler_psi = ReduceLROnPlateau(optimizer_adam_psi , factor = 0.5 , min_lr = 1e-2 , verbose=False )
+    scheduler_omega = ReduceLROnPlateau(optimizer_adam_omega , factor = 0.5 , min_lr = 1e-2 , verbose=False )
+
+    opt_u_lbfgs=torch.optim.LBFGS(PINN_u.parameters(),
+      lr=0.01,  # or adjust based on your problem
+      max_iter=100,  # More iterations for better convergence
+      max_eval=None,  # Default
+      tolerance_grad=1e-7,  # Increase sensitivity to gradients
+      tolerance_change=1e-9,  # Keep default unless facing early stops
+      history_size=100,  # Use larger history for better approximations
+      line_search_fn="strong_wolfe")  # Use strong Wolfe line search for better convergence
+
+
+    opt_v_lbfgs=torch.optim.LBFGS(PINN_v.parameters(),
+      lr=0.01,  # or adjust based on your problem
+      max_iter=100,  # More iterations for better convergence
+      max_eval=None,  # Default
+      tolerance_grad=1e-7,  # Increase sensitivity to gradients
+      tolerance_change=1e-9,  # Keep default unless facing early stops
+      history_size=100,  # Use larger history for better approximations
+      line_search_fn="strong_wolfe")  # Use strong Wolfe line search for better convergence
+
+    opt_p_lbfgs=torch.optim.LBFGS(PINN_p.parameters(),
+      lr=0.01,  # or adjust based on your problem
+      max_iter=100,  # More iterations for better convergence
+      max_eval=None,  # Default
+      tolerance_grad=1e-7,  # Increase sensitivity to gradients
+      tolerance_change=1e-9,  # Keep default unless facing early stops
+      history_size=100,  # Use larger history for better approximations
+      line_search_fn="strong_wolfe")  # Use strong Wolfe line search for better convergence
+
+    opt_T_lbfgs=torch.optim.LBFGS(PINN_T.parameters(),
+      lr=0.01,  # or adjust based on your problem
+      max_iter=100,  # More iterations for better convergence
+      max_eval=None,  # Default
+      tolerance_grad=1e-7,  # Increase sensitivity to gradients
+      tolerance_change=1e-9,  # Keep default unless facing early stops
+      history_size=100,  # Use larger history for better approximations
+      line_search_fn="strong_wolfe")  # Use strong Wolfe line search for better convergence
+
+    opt_psi_lbfgs=torch.optim.LBFGS(PINN_psi.parameters(),
+      lr=0.01,  # or adjust based on your problem
+      max_iter=100,  # More iterations for better convergence
+      max_eval=None,  # Default
+      tolerance_grad=1e-7,  # Increase sensitivity to gradients
+      tolerance_change=1e-9,  # Keep default unless facing early stops
+      history_size=100,  # Use larger history for better approximations
+      line_search_fn="strong_wolfe")  # Use strong Wolfe line search for better convergence
+    
+    opt_omega_lbfgs=torch.optim.LBFGS(PINN_omega.parameters(),
+      lr=0.01,  # or adjust based on your problem
+      max_iter=100,  # More iterations for better convergence
+      max_eval=None,  # Default
+      tolerance_grad=1e-7,  # Increase sensitivity to gradients
+      tolerance_change=1e-9,  # Keep default unless facing early stops
+      history_size=100,  # Use larger history for better approximations
+      line_search_fn="strong_wolfe")  # Use strong Wolfe line search for better convergence
+
+
+
+
+    ##############collocation points definition######################################################
+    # Define domain boundaries
+
+    x_min = 0
+    y_min = 0
+
+    x_max = 10
+    y_max = 5
+
+    # Define cube boundaries within the domain (example values)
+    cube_x_min, cube_x_max = 4.5, 5.5  # x bounds of cube
+    cube_y_min, cube_y_max = 0, 1  # y bounds of cube
+
+    # Generate random collocation points within the domain
+    np.random.seed(50)
+    collocation_points = np.random.rand(num_collocation_points, 2)
+    collocation_points[:, 0] = collocation_points[:, 0] * (x_max - x_min) + x_min  # Scale to x bounds
+    collocation_points[:, 1] = collocation_points[:, 1] * (y_max - y_min) + y_min  # Scale to y bounds
+
+    # Filter out points that fall within the cube's region
+    filtered_points = collocation_points[
+        ~(
+        (collocation_points[:, 0] >= cube_x_min) &
+        (collocation_points[:, 0] <= cube_x_max) &
+        (collocation_points[:, 1] >= cube_y_min) &
+        (collocation_points[:, 1] <= cube_y_max)
+        )]
+
+
+    collocation_points_tensor = torch.tensor(filtered_points, dtype=torch.float32 ,  requires_grad=True)
+
+    #plot selected points in domain
+    plt.figure()
+    plt.plot(np.zeros(10) , np.linspace(y_min, y_max , 10) , 'r')
+    plt.plot(x_max * np.ones(10) , np.linspace(y_min, y_max , 10) , 'r')
+
+    plt.plot(np.linspace(x_min, cube_x_min , 10) , np.zeros(10) , 'r')
+    plt.plot(np.linspace(cube_x_max, x_max , 10) , np.zeros(10) , 'r')
+    plt.plot(np.linspace(x_min, x_max , 10) , y_max * np.ones(10) , 'r')
+    plt.scatter(filtered_points[: , 0] , filtered_points[: , 1] , s=np.ones(len(filtered_points)) * 1 , color = 'k')
+
+    plt.plot([4.5, 4.5 , 5.5 , 5.5], [0.0 , 1.0 , 1.0 , 0.0], 'tab:red',  linewidth=4)
+    plt.xlabel("Ground and cube")
+    plt.ylabel("Inlet")
+    plt.grid()
+    plt.show()
+    #plt.savefig("interiort.png")
+
+
+    # Normalize PyTorch tensors for use in the PINN model
+    X_c = (normal_inputs(collocation_points_tensor[: , 0])).reshape(-1 , 1)
+    Y_c = (normal_inputs(collocation_points_tensor[: , 1])).reshape(-1 , 1)
+
+
+    #######################Finish collocation_points######################################################/
+
+    ####################### Interior & Boundary data preparation ##########################################/
+
+    interior_data = normal_inputs(pd.read_csv(filename_data))
+    boundary_data = normal_inputs(pd.read_csv(filename_bc))
+
+    X_interior = torch.tensor(interior_data[['x','y']].values, dtype=torch.float32)
+    Y_interior = torch.tensor(interior_data[['u' ,'v' ,'T' ,'p']].values, dtype=torch.float32)
+    X_boundary = torch.tensor(boundary_data[['x','y']].values, dtype=torch.float32)
+    Y_boundary = torch.tensor(boundary_data[['u','v','T' ,'p']].values, dtype=torch.float32)
+    ####################### Finish Interior & Boundary data preparation ####################################/
+
+    ####################### HyperPerameter Tuning with Opyuna  #############################################/
+    # Hyperparameter tuning with Optuna
+    def objective(trial):
+
+        # Hyperparameters for tuning
+        lambda_pde = trial.suggest_float("lambda_pde", 1, 10)
+        lambda_interior = trial.suggest_float("lambda_interior", 0 ,10)
+        lambda_bc = trial.suggest_float("lambda_bc", 0, 10)
+
+        opt_u_adam = optim.Adam(PINN_u.parameters() , lr = 1e-3)
+        opt_v_adam = optim.Adam(PINN_v.parameters() , lr = 1e-3)
+        opt_p_adam = optim.Adam(PINN_u.parameters() , lr = 1e-3)
+        opt_psi_adam = optim.Adam(PINN_psi.parameters() , lr = 1e-3)
+        opt_omega_adam = optim.Adam(PINN_omega.parameters() , lr = 1e-3)
+        opt_T_adam = optim.Adam(PINN_T.parameters() , lr = 1e-3)
+
+        num_epochs_trial = 50  #best value is 500
+        for epoch in range(num_epochs_trial):
+            opt_u_adam.zero_grad()
+            opt_v_adam.zero_grad()
+            opt_p_adam.zero_grad()
+            opt_psi_adam.zero_grad()
+            opt_omega_adam.zero_grad()
+            opt_T_adam.zero_grad()
+
+            # Compute predictions and loss
+            pde_loss = residula_loss(PINN_u , PINN_v , PINN_p ,PINN_T , PINN_psi, PINN_omega  , X_c, Y_c )
+            bc_loss = boundary_condition_loss(PINN_u , PINN_v , PINN_p ,PINN_T , X_boundary , Y_boundary)
+            interior_loss = data_loss(PINN_u , PINN_v , PINN_p ,PINN_T , X_interior, Y_interior)
+            noisy_loss = noisy_data_loss(PINN_u , PINN_v , PINN_p ,PINN_T , X_interior, Y_interior)
+            loss = (pde_loss * lambda_pde) + (bc_loss * lambda_bc) + (interior_loss * lambda_interior) #+ (noisy_loss * w_noise)
+
+            loss.backward(retain_graph=True)
+            opt_u_adam.step()
+            opt_v_adam.step()
+            opt_p_adam.step()
+            opt_psi_adam.step()
+            opt_omega_adam.step()
+            opt_T_adam.step()
+
+            # Return the final loss for this trial
+            return loss.item()
+
+    num_trials= 50
+    # Run the Optuna hyperparameter optimization
+    study = optuna.create_study(direction="minimize")
+    study.optimize(objective, n_trials = num_trials)  # Adjust n_trials for more thorough search
+
+    # Extract the best lambda values
+    best_params = study.best_params
+    print("Optimized lambda_pde:", best_params["lambda_pde"])
+    print("Optimized lambda_interior:", best_params["lambda_interior"])
+    print("optimized lambda_bc:", best_params["lambda_bc"])
+
+    lambda_pde = best_params["lambda_pde"]
+    lambda_interior = best_params["lambda_interior"]
+    lambda_bc = best_params["lambda_bc"]
+
+    ####################### Finish HyperPerameter Tuning with Opyuna  #############################################/
+
+    ##################### Trainig with Cross Validation interior & boundary data plus Loss calculation ############/
+
+    fold_loss = []  # Define fold_loss here to store the validation loss of each fold
+    k = 4
+    kf = KFold(n_splits=k)
+    fold_results = []
+
+    for fold, (train_index, val_index) in enumerate(kf.split(X_interior)):
+
+        # Split interior data for training and validation
+        #CAUTION_ revise these tensors with : sourceTEnsor.clone().detach().requires_grad_(True)
+        X_train_interior = torch.tensor(X_interior[train_index], dtype=torch.float32)
+        Y_train_interior = torch.tensor(Y_interior[train_index], dtype=torch.float32)
+
+        X_val_interior = torch.tensor(X_interior[val_index], dtype=torch.float32)
+        Y_val_interior = torch.tensor(Y_interior[val_index], dtype=torch.float32)
+
+        X_train_boundary = torch.tensor(X_boundary[train_index], dtype=torch.float32)
+        Y_train_boundary = torch.tensor(Y_boundary[train_index], dtype=torch.float32)
+
+        X_val_boundary = torch.tensor(X_boundary[val_index], dtype=torch.float32)
+        Y_val_boundary = torch.tensor(Y_boundary[val_index], dtype=torch.float32)
+
+
+        for epoch in range(epochs_adam):
+            PINN_u.train()
+            PINN_v.train()
+            PINN_T.train()
+            PINN_p.train()
+            PINN_psi.train()
+            PINN_omega.train()
+
+            optimizer_adam_u.zero_grad()
+            optimizer_adam_v.zero_grad()
+            optimizer_adam_T.zero_grad()
+            optimizer_adam_p.zero_grad()
+            optimizer_adam_psi.zero_grad()
+            optimizer_adam_omega.zero_grad()
+
+
+            # Compute predictions and loss
+            pde_loss = residula_loss(PINN_u , PINN_v , PINN_p ,PINN_T , PINN_psi, PINN_omega  , X_c, Y_c )
+            bc_loss = boundary_condition_loss(PINN_u , PINN_v , PINN_p ,PINN_T , X_train_boundary , Y_train_boundary)
+            interior_loss = data_loss(PINN_u , PINN_v , PINN_p ,PINN_T , X_train_interior, Y_train_interior)
+            #noisy_loss = noisy_data_loss(PINN_u , PINN_v , PINN_p ,PINN_T , X_data, Y_data)
+            loss = (pde_loss * lambda_pde) + (bc_loss * lambda_bc) + (interior_loss * lambda_interior)# + (noisy_loss * w_noise)
+
+            # Backpropagation
+            loss.backward(retain_graph=True)
+            optimizer_adam_u.step()
+            optimizer_adam_v.step()
+            optimizer_adam_T.step()
+            optimizer_adam_p.step()
+            optimizer_adam_psi.step()
+            optimizer_adam_omega.step()
+            
+            
+
+            scheduler_u.step(loss)
+            scheduler_v.step(loss)
+            scheduler_T.step(loss)
+            scheduler_p.step(loss)
+            scheduler_psi.step(loss)
+            scheduler_omega.step(loss)
+
+
+            if epoch % 500 == 0:
+                print(f'Epoch Adam {epoch}/{epochs_adam} [Fold:{fold}] [{100 * epoch/epochs_adam :.2f}%]  ,Total Loss: {loss.item():.6f}  ')
+                print(f"learning rate is , LR u: {optimizer_adam_u.param_groups[0]['lr']} | LR v: {optimizer_adam_v.param_groups[0]['lr']} | LR T: {optimizer_adam_T.param_groups[0]['lr']}")
+                print(f"======================================================================")
+            if loss.item() < 0.01:
+                print(f" loss valuse is {loss.item():.4f} so optimziation switches to LBGF-S . . . ")
+                break
+
+
+        def closure():
+            optimizer_adam_u.zero_grad()
+            optimizer_adam_v.zero_grad()
+            optimizer_adam_T.zero_grad()
+            optimizer_adam_p.zero_grad()
+            optimizer_adam_psi.zero_grad()
+            optimizer_adam_omega.zero_grad()
+
+            # Compute predictions and loss for LBGFS optimization
+            pde_loss = residula_loss(PINN_u , PINN_v , PINN_p ,PINN_T , PINN_psi, PINN_omega , X_c, Y_c )
+            bc_loss = boundary_condition_loss(PINN_u , PINN_v , PINN_p ,PINN_T , X_train_boundary , Y_train_boundary)
+            interior_loss = data_loss(PINN_u , PINN_v , PINN_p ,PINN_T , X_train_interior, Y_train_interior)
+            #noisy_loss = noisy_data_loss(PINN_u , PINN_v , PINN_p ,PINN_T , X_data, Y_data)
+            loss = (pde_loss * lambda_pde) + (bc_loss * lambda_bc) + (interior_loss * lambda_interior)# + (noisy_loss * w_noise)
+
+            loss.backward(retain_graph=True)
+
+            return loss
+
+        # Configure L-BFGS optimizer and optimize
+
+        for epoch in range(epoch_lbgfs):
+            opt_u_lbfgs.step(closure)
+            opt_v_lbfgs.step(closure)
+            opt_T_lbfgs.step(closure)
+            opt_p_lbfgs.step(closure)
+            opt_psi_lbfgs.step(closure)
+            opt_omega_lbfgs.step(closure)
+            
+
+            if epoch % 10 == 0:
+                print(f'Epoch LBGF-S {epoch}/{epoch_lbgfs} [Fold:{fold}] [{100 * epoch/epoch_lbgfs :.2f}%]  ,Total Loss: {loss.item():.6f}  ')
+
+        ###################### Validation section of Cross-Validation #########################################/
+
+        PINN_u.eval()
+        PINN_v.eval()
+        PINN_T.eval()
+        PINN_p.eval()
+        PINN_omega.eval()
+        PINN_psi.eval()
+
+
+        # Compute predictions and loss for Validation part
+        pde_loss = residula_loss(PINN_u , PINN_v , PINN_p ,PINN_T , PINN_psi, PINN_omega  , X_c, Y_c )
+        bc_loss = boundary_condition_loss(PINN_u , PINN_v , PINN_p ,PINN_T , X_val_boundary , Y_val_boundary)
+        interior_loss = data_loss(PINN_u , PINN_v , PINN_p ,PINN_T , X_val_interior, Y_val_interior)
+        #noisy_loss = noisy_data_loss(PINN_u , PINN_v , PINN_p ,PINN_T , X_data, Y_data)
+        val_loss = (pde_loss * lambda_pde) + (bc_loss * lambda_bc) + (interior_loss * lambda_interior)# + (noisy_loss * w_noise)
+        fold_results.append(val_loss.item())
+
+
+
+
+    toc_batch = time.time()
+    duration_time = toc_batch - tic
+    print(f"Batch_Duration :{duration_time :.2f} s")
+
+    # Compute overall cross-validation loss
+    cross_val_loss = sum(fold_loss) / (len(fold_loss) + 1e-10)
+    print(f"[Fold{fold / k }] , overall cross-validation loss: {cross_val_loss:.5f}")
+
+
+
+    toc = time.time()
+    elapseTime = toc - tic
+    print ("elapse time in parallel = ", str(round(elapseTime , 4)) + " s")
+
+
+#lambda_pde = 1 #12
+#lambda_interior = 1 #4
+#lambda_bc = 1 #0.05
+#w_noise = 0.00000010
+
+epoch_lbgfs = 1
+epochs_adam = 15000
+collocation_points = 500
+
+filename_data = r'2D_newData.csv'
+filename_bc =  r'BC_data_2D_Lamin.csv'
+f_test = r'2D_newTest.csv'
+
+
+
+train_pinn(PINN_u , PINN_v , PINN_p ,PINN_T , PINN_psi, PINN_omega , filename_data,
+    filename_bc  ,epochs_adam , epoch_lbgfs , num_collocation_points  )
+
+############################ plot section ################
+
+
+
+plot_results(PINN_u , PINN_v , PINN_T , PINN_p, f_test )
+plot_results(PINN_u , PINN_v , PINN_T , PINN_p, filename_data )
+
+########################################################
+"""
+torch.save(PINN_u , "pinn_model_u_full.pth")
+torch.save(PINN_v , " pinn_model_v_full.pth")
+torch.save(PINN_p , "pinn_model_p_full.pth")
+torch.save(PINN_T , "pinn_model_T_full.pth")
+
+
+
+#In the case of lading mdoel:
+
+model = torch.load("pinn_model_full.pth")
+model.eval()
+"""
