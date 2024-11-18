@@ -1,4 +1,4 @@
-# [2D PINN Solver: Physics-Informed Neural Networks for 2D Problems](https://github.com/arezayan/selfOptim_PINN_2Dflow/)
+# [2D PINN Solver: Physics-Informed Neural Networks for 2D laminar flow over a box](https://github.com/arezayan/selfOptim_PINN_2Dflow/)
 
 > **Important:** *This repository provides a Python-based implementation of a 2D Physics-Informed Neural Network (PINN) designed to solve Partial Differential Equations (PDEs) in two dimensions. The code is structured for flexibility, enabling users to define custom governing equations, boundary conditions, and datasets.*
 
