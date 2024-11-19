@@ -1,9 +1,9 @@
 file_data = r"2D_newData.csv"
 #file_data = r"data_2D_Lamin.csv"
-fileBC = r"BC_data_2D_Lamin.csv"
+fileBC = r"BC_data_2D_Lamin.csv"  # Boundary data used for explicity impose
 fileTest = r"2D_newTest.csv"
 
-import torch
+import torch #version 2.4.1 is used
 import numpy as np
 import torch.nn as nn
 import matplotlib.pyplot as plt
