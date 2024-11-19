@@ -11,7 +11,7 @@
 * Compatibility with CSV-based datasets for boundary and interior data.
 > # Features:
 * Governing Equations:
-* Solves custom PDEs such as the Navier-Stokes and Energy equations.
+* Solves PDEs such as the Continuity Navier-Stokes and Energy equations.
 > # Loss Functions:
 * Includes separate loss components for:
 >> * PDE residuals
